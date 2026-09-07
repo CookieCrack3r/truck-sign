@@ -236,7 +236,3 @@ Congratulations =) !!! The App should be running in [localhost:8000](http://loca
 - Create Virual Environment with Virtualenv and Virtualenvwrapper: [Link](https://docs.python-guide.org/dev/virtualenvs/)
 - [Configure CORS](https://www.stackhawk.com/blog/django-cors-guide/)
 - [Setup Django with Cloudinary](https://cloudinary.com/documentation/django_integration)
-
-
-
-https://developer-akademie-devsecopskurs.github.io/dso-faq-site/de/docs/projects/truck-signs-api-v2/description/
