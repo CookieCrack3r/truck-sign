@@ -1,0 +1,30 @@
+# Keep the build context (and therefore the image) free of anything the
+# application does not need at runtime.
+.git
+.github
+.gitattributes
+.gitignore
+.dockerignore
+
+# Local configuration and notes - never bake secrets into an image.
+.env
+*.env
+!example.env
+notizen.txt
+
+# Compose and docs are used on the host, not inside the container.
+docker-compose.yml
+README.md
+docs/
+Procfile
+
+# Python and editor artefacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vscode/
+.idea/
+
+# Screenshots are only referenced from the README.
+src/screenshots/
