@@ -180,7 +180,7 @@ To build it under the name the Compose file expects, so that `docker compose up`
 build instead of pulling from GHCR:
 
 ```bash
-docker build -t ghcr.io/cookiecrack3r/truck-sign:main .
+docker build -t ghcr.io/cookiecrack3r/truck-sign:v1.0.0 .
 ```
 
 A detailed description of the build, tagging and publishing is in
@@ -226,7 +226,7 @@ Two forms are used in `docker-compose.yml`:
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `BACKEND_PORT` | no | `8020` | Host port the API is published on. |
-| `IMAGE_TAG` | no | `main` | Which image tag to deploy. `main` is the latest build of the default branch; use a release tag such as `v1.0.0` to pin a specific build. |
+| `IMAGE_TAG` | no | `v1.0.0` | Which image tag to deploy. The default is a pinned release tag. Use a newer release such as `v1.1.0`, or `main` for the latest build of the default branch. |
 | `GUNICORN_WORKERS` | no | `4` | Number of Gunicorn worker processes. A common starting point is `2 x CPU cores + 1`. |
 | `DB_WAIT_RETRIES` | no | `30` | How many times the entrypoint retries the database connection before giving up. |
 | `DB_WAIT_INTERVAL` | no | `2` | Seconds between those retries. |
@@ -284,8 +284,8 @@ To publish the image manually instead of through CI:
 
 ```bash
 echo "<your-github-token>" | docker login ghcr.io -u <your-github-username> --password-stdin
-docker build -t ghcr.io/<your-github-username>/truck-sign:main .
-docker push ghcr.io/<your-github-username>/truck-sign:main
+docker build -t ghcr.io/<your-github-username>/truck-sign:v1.0.0 .
+docker push ghcr.io/<your-github-username>/truck-sign:v1.0.0
 ```
 
 The token needs the `write:packages` scope. Normally this is done by the
@@ -307,8 +307,8 @@ docker compose down             # stop and remove containers, keep volumes
 Things you are likely to change in `docker-compose.yml`:
 
 * **Which image is deployed.** The `backend` service references
-  `ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-main}`. Replace the image path if you forked
-  the repository, and set `IMAGE_TAG` in `.env` to deploy a specific build.
+  `ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-v1.0.0}`. Replace the image path if you forked
+  the repository, and set `IMAGE_TAG` in `.env` to deploy a different build.
 * **The published port.** See [Changing the Published Port](#changing-the-published-port).
 * **The PostgreSQL version.** The `db` service uses `postgres:17-alpine`. Changing the major
   version requires migrating the data directory: a `postgres_data` volume created by an older
@@ -367,7 +367,7 @@ docker run -d \
   -e DJANGO_SUPERUSER_PASSWORD='<your-admin-password>' \
   -v static_files:/app/src/staticfiles \
   -v media_files:/app/src/mediafiles \
-  ghcr.io/cookiecrack3r/truck-sign:main
+  ghcr.io/cookiecrack3r/truck-sign:v1.0.0
 ```
 
 Passing secrets on the command line puts them into your shell history and into `docker inspect`.
@@ -383,7 +383,7 @@ docker run -d \
   -e DB_HOST='tsa_db' \
   -v static_files:/app/src/staticfiles \
   -v media_files:/app/src/mediafiles \
-  ghcr.io/cookiecrack3r/truck-sign:main
+  ghcr.io/cookiecrack3r/truck-sign:v1.0.0
 ```
 
 ### Changing the Published Port

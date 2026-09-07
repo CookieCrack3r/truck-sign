@@ -40,8 +40,9 @@ services:
     # inside the Compose network, never from the internet.
 
   backend:
-    # Pulled, not built. Override IMAGE_TAG in .env to pin a specific build.
-    image: ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-main}
+    # Pulled, not built. The default is a pinned release tag; override IMAGE_TAG
+    # in .env to deploy a different build.
+    image: ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-v1.0.0}
     container_name: tsa_backend
     restart: unless-stopped
     environment:
