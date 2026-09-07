@@ -7,6 +7,6 @@ RUN pip install
 
 COPY . /app
 
-EXPOSE
+EXPOSE 8000
 
 ENTRYPOINT ["entrypoint.sh"]
