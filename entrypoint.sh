@@ -16,16 +16,14 @@ export DB_PORT="${DB_PORT:-5432}"
 
 GUNICORN_BIND="${GUNICORN_BIND:-0.0.0.0:8000}"
 GUNICORN_WORKERS="${GUNICORN_WORKERS:-4}"
-DB_WAIT_RETRIES="${DB_WAIT_RETRIES:-30}"
-DB_WAIT_INTERVAL="${DB_WAIT_INTERVAL:-2}"
 
 echo "[entrypoint] waiting for postgres at ${DB_HOST}:${DB_PORT} ..."
 
-# psycopg2 is installed anyway, so probe with a real connection attempt instead
-# of a plain port check: postgres opens the port while it is still initialising
-# and only accepts logins once the database is actually ready.
-ATTEMPT=0
-until python -c '
+# Wait for the database to be up and ready, if not ready, then sleep for 5 seconds.
+# The slim image has no netcat, so probe with psycopg2, which is installed anyway.
+# A real connection attempt is also the better check: postgres opens the port
+# while it is still initialising and only accepts logins once it is ready.
+while ! python -c '
 import os, psycopg2
 psycopg2.connect(
     dbname=os.environ["DB_NAME"],
@@ -35,13 +33,8 @@ psycopg2.connect(
     port=os.environ["DB_PORT"],
 )
 ' 2>/dev/null; do
-    ATTEMPT=$((ATTEMPT + 1))
-    if [ "${ATTEMPT}" -ge "${DB_WAIT_RETRIES}" ]; then
-        echo "[entrypoint] postgres unreachable after ${DB_WAIT_RETRIES} attempts - giving up." >&2
-        exit 1
-    fi
-    echo "[entrypoint] postgres is unavailable - retrying in ${DB_WAIT_INTERVAL}s (${ATTEMPT}/${DB_WAIT_RETRIES}) ..."
-    sleep "${DB_WAIT_INTERVAL}"
+    echo "[entrypoint] postgres is unavailable - sleeping 5s ..."
+    sleep 5
 done
 
 echo "[entrypoint] postgres is active"

@@ -42,7 +42,7 @@ services:
   backend:
     # Pulled, not built. The default is a pinned release tag; override IMAGE_TAG
     # in .env to deploy a different build.
-    image: ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-v1.0.0}
+    image: ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-v1.0.1}
     container_name: tsa_backend
     restart: unless-stopped
     environment:
@@ -52,13 +52,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-      # Database - the host is the service name above, resolved by Docker's
-      # embedded DNS inside tsa-network.
+      # Database. DB_HOST defaults to the service name above, resolved by
+      # Docker's embedded DNS inside tsa-network.
       DB_NAME: ${DB_NAME:-trucksigns_db}
       DB_USER: ${DB_USER:-trucksigns_user}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
-      DB_HOST: db
-      DB_PORT: 5432
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       # Optional: when username and password are set, the entrypoint creates
       # the admin account on first start and skips it afterwards.

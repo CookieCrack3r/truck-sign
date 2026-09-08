@@ -20,6 +20,7 @@
   - [Running with docker run](#running-with-docker-run)
   - [Data Persistence](#data-persistence)
   - [Common Commands](#common-commands)
+- [Repository Contents](#repository-contents)
 - [CI/CD Pipeline](#cicd-pipeline)
 - [API and Admin](#api-and-admin)
 - [Screenshots](#screenshots)
@@ -29,26 +30,10 @@
 
 **Signs for Trucks** is an online store for pre-designed vinyls with custom letterings. This
 repository holds the **Truck Signs API** - the Django/DRF backend and admin panel - together with
-everything needed to run it as a container.
-
-The image is built by GitHub Actions and published to the GitHub Container Registry. The Compose
-stack **pulls** that image; nothing is built on the deployment host. Only the backend publishes a
-port (8020); PostgreSQL is reachable only inside the Compose network.
-
-| Path | Description |
-| --- | --- |
-| `Dockerfile` | Builds the backend image: `python:3.12-slim`, dependencies, unprivileged user, entrypoint. |
-| `docker-compose.yml` | The stack: `backend` (pulled from GHCR) and `db` (PostgreSQL), one network, three named volumes. |
-| `entrypoint.sh` | Waits for PostgreSQL, migrates, collects static files, ensures the admin account, starts Gunicorn. |
-| `example.env` | Template for `.env`. Copy it; never commit the real one. |
-| `requirements.txt` | Pinned Python dependencies. |
-| `pyproject.toml` | Config for `black`, `isort` and `flake8`. |
-| `Procfile` | Legacy Heroku process definition. Unused by the container setup. |
-| `.dockerignore` | Keeps git metadata, docs and `.env` out of the image. |
-| `.gitattributes` | Forces LF endings for shell scripts - a CRLF shebang breaks the container. |
-| `.github/workflows/` | Build, test and PR-check pipelines. See [CI/CD Pipeline](#cicd-pipeline). |
-| `docs/testing.md` | Linter and test setup. |
-| `src/` | The Django project: `manage.py`, `tsa_app` (settings, URLs, WSGI), `tsa_products` (models, views, tests). |
+everything needed to run it as a container. The image is built by GitHub Actions and published to
+the GitHub Container Registry; the Compose stack pulls that image, so nothing is built on the
+deployment host. Only the backend publishes a port (8020) - PostgreSQL is reachable exclusively
+from inside the Compose network.
 
 ## Prerequisites
 
@@ -88,7 +73,7 @@ Only needed when you change the application or the `Dockerfile` - otherwise the 
 docker build -t truck-sign:local .
 
 # under the name the Compose file expects, so `docker compose up` uses your build
-docker build -t ghcr.io/cookiecrack3r/truck-sign:v1.0.0 .
+docker build -t ghcr.io/cookiecrack3r/truck-sign:v1.0.1 .
 ```
 
 ## Usage
@@ -111,10 +96,10 @@ and aborts with that message if unset - rather than silently starting with an in
 | `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma separated. Add your server address, otherwise Django answers `400`. |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Origins allowed to call the API. |
 | `DB_NAME` / `DB_USER` | `trucksigns_db` / `trucksigns_user` | Database name and user. |
+| `DB_HOST` / `DB_PORT` | `db` / `5432` | Database address. Change only to point the backend at a database outside this stack. |
 | `BACKEND_PORT` | `8020` | Host port. Change it here, not the container port `8000`. |
-| `IMAGE_TAG` | `v1.0.0` | Image tag to deploy. Use `main` for the latest default-branch build. |
-| `GUNICORN_WORKERS` | `4` | Worker processes. |
-| `DB_WAIT_RETRIES` / `DB_WAIT_INTERVAL` | `30` / `2` | Database wait loop in the entrypoint. |
+| `IMAGE_TAG` | `v1.0.1` | Image tag to deploy. Use `main` for the latest default-branch build. |
+| `GUNICORN_WORKERS` / `GUNICORN_BIND` | `4` / `0.0.0.0:8000` | Worker processes and bind address. |
 | `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | empty | When username and password are set, the entrypoint creates this admin account on first start and skips it on every later start. |
 | `CLOUD_NAME` / `CLOUD_API_KEY` / `CLOUD_API_SECRET` | empty | Optional Cloudinary storage. Empty means local media volume. |
 
@@ -134,8 +119,8 @@ Publishing manually (normally done by CI):
 
 ```bash
 echo "<your-github-token>" | docker login ghcr.io -u <your-github-username> --password-stdin
-docker build -t ghcr.io/<your-github-username>/truck-sign:v1.0.0 .
-docker push ghcr.io/<your-github-username>/truck-sign:v1.0.0
+docker build -t ghcr.io/<your-github-username>/truck-sign:v1.0.1 .
+docker push ghcr.io/<your-github-username>/truck-sign:v1.0.1
 ```
 
 ### Running with docker run
@@ -171,7 +156,7 @@ docker run -d \
   -e DJANGO_SUPERUSER_PASSWORD='<your-admin-password>' \
   -v static_files:/app/src/staticfiles \
   -v media_files:/app/src/mediafiles \
-  ghcr.io/cookiecrack3r/truck-sign:v1.0.0
+  ghcr.io/cookiecrack3r/truck-sign:v1.0.1
 ```
 
 Secrets on the command line end up in the shell history and in `docker inspect`. Prefer
@@ -203,6 +188,23 @@ docker compose exec db pg_dump -U <user> <database> > backup.sql
 Common problems: `DB_PASSWORD must be set in .env` means the `.env` is missing; a `400` on every
 URL means the host is not in `ALLOWED_HOSTS`; `manifest unknown` on pull means the GHCR package is
 private or the tag does not exist.
+
+## Repository Contents
+
+| Path | Description |
+| --- | --- |
+| `Dockerfile` | Builds the backend image: `python:3.12-slim`, dependencies, unprivileged user, entrypoint. |
+| `docker-compose.yml` | The stack: `backend` (pulled from GHCR) and `db` (PostgreSQL), one network, three named volumes. |
+| `entrypoint.sh` | Waits for PostgreSQL, migrates, collects static files, ensures the admin account, starts Gunicorn. |
+| `example.env` | Template for `.env`. Copy it; never commit the real one. |
+| `requirements.txt` | Pinned Python dependencies. |
+| `pyproject.toml` | Config for `black`, `isort` and `flake8`. |
+| `Procfile` | Legacy Heroku process definition. Unused by the container setup. |
+| `.dockerignore` | Keeps git metadata, docs and `.env` out of the image. |
+| `.gitattributes` | Forces LF endings for shell scripts - a CRLF shebang breaks the container. |
+| `.github/workflows/` | Build, test and PR-check pipelines. See [CI/CD Pipeline](#cicd-pipeline). |
+| `docs/testing.md` | Linter and test setup. |
+| `src/` | The Django project: `manage.py`, `tsa_app` (settings, URLs, WSGI), `tsa_products` (models, views, tests). |
 
 ## CI/CD Pipeline
 
