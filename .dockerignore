@@ -5,12 +5,12 @@
 .gitattributes
 .gitignore
 .dockerignore
-
 # Local configuration and notes - never bake secrets into an image.
 .env
 *.env
-!example.env
-notizen.txt
+example.env
+README.md
+Trustpilot-API-Notes.txt
 
 # Compose and docs are used on the host, not inside the container.
 docker-compose.yml

@@ -18,6 +18,7 @@ from .views import (
     UploadCustomerImage,
 )
 
+
 app_name = "tsa_products"
 
 urlpatterns = [
