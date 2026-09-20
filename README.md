@@ -2,237 +2,258 @@
 
 # Signs for Trucks
 
-![Python version](https://img.shields.io/badge/Python-3.12.0-4c566a?logo=python&&longCache=true&logoColor=white&colorB=pink&style=flat-square&colorA=4c566a) ![Django version](https://img.shields.io/badge/Django-5.2.8-4c566a?logo=django&&longCache=truelogoColor=white&colorB=pink&style=flat-square&colorA=4c566a) ![Django-RestFramework](https://img.shields.io/badge/Django_Rest_Framework-3.16.1-red.svg?longCache=true&style=flat-square&logo=django&logoColor=white&colorA=4c566a&colorB=pink)
+![Python](https://img.shields.io/badge/Python-3.12-4c566a?logo=python&logoColor=white&colorB=pink&style=flat-square&colorA=4c566a) ![Django](https://img.shields.io/badge/Django-5.2.8-4c566a?logo=django&logoColor=white&colorB=pink&style=flat-square&colorA=4c566a) ![DRF](https://img.shields.io/badge/DRF-3.16.1-4c566a?logo=django&logoColor=white&colorB=pink&style=flat-square&colorA=4c566a) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4c566a?logo=postgresql&logoColor=white&colorB=pink&style=flat-square&colorA=4c566a)
 
 ![Truck Signs](./src/screenshots/Truck_Signs_logo.png)
-
-__Signs for Trucks__ is an online store to buy pre-designed vinyls with custom lines of letters (often call truck letterings).
-The store also allows clients to upload their own designs and to customize them on the website as well.
 
 </div>
 
 ## Table of Contents
 
-- [Signs for Trucks](#signs-for-trucks)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Quickstart](#quickstart)
-  - [Usage](#usage)
-    - [Settings](#settings)
-    - [Models](#models)
-    - [Brief Explanation of the Views](#brief-explanation-of-the-views)
-    - [Installation](#installation)
-  - [Screenshots of the Django Backend Admin Panel](#screenshots-of-the-django-backend-admin-panel)
-    - [Mobile View](#mobile-view)
-    - [Desktop View](#desktop-view)
-  - [Additional Information](#additional-information)
-    - [Postgresql Database](#postgresql-database)
-    - [Docker](#docker)
-    - [Django and DRF](#django-and-drf)
-    - [Miscellaneous](#miscellaneous)
+- [About This Repository](#about-this-repository)
+- [Prerequisites](#prerequisites)
+- [Quickstart](#quickstart)
+  - [How to Build the Image](#how-to-build-the-image)
+- [Usage](#usage)
+  - [Configuration](#configuration)
+  - [Building and Publishing the Image](#building-and-publishing-the-image)
+  - [Running with docker run](#running-with-docker-run)
+  - [Data Persistence](#data-persistence)
+  - [Common Commands](#common-commands)
+- [Repository Contents](#repository-contents)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [API and Admin](#api-and-admin)
+- [Screenshots](#screenshots)
+- [Further Reading](#further-reading)
+
+## About This Repository
+
+**Signs for Trucks** is an online store for pre-designed vinyls with custom letterings. This
+repository holds the **Truck Signs API** - the Django/DRF backend and admin panel - together with
+everything needed to run it as a container. The image is built by GitHub Actions and published to
+the GitHub Container Registry; the Compose stack pulls that image, so nothing is built on the
+deployment host. Only the backend publishes a port (8020) - PostgreSQL is reachable exclusively
+from inside the Compose network.
 
 ## Prerequisites
 
-* [Python 3.12.0](https://www.python.org/downloads/release/python-3120/)
-* [Git](https://git-scm.com/install/)
+* [Docker Engine](https://docs.docker.com/engine/install/) with the Compose v2 plugin
+* [Git](https://git-scm.com/downloads)
+* Python 3.12 - only for local development without Docker
 
 ## Quickstart
 
-1. Clone the repo:
 ```bash
-git clone git@github.com:Developer-Akademie-DevSecOpsKurs/truck-signs-api.git
-cd truck-signs-api
+git clone https://github.com/CookieCrack3r/truck-sign.git
+cd truck-sign
+
+cp example.env .env      # then fill in the placeholders
+docker compose up -d
+docker compose logs -f backend
 ```
 
-2. Copy the content of the example.env file into a .env file:
-```bash
-cp example.env .env
-```
+`SECRET_KEY` and `DB_PASSWORD` are required - Compose refuses to start without them. Generate a
+key with `openssl rand -base64 48`.
 
-3. Create virtual environment:
-```bash
-python -m venv <venv_name>
-```
+The API is then served on **port 8020**:
 
-4. Activate virtual environment:
-```bash
-source <venv_name>/scripts/activate
-```
+| URL | |
+| --- | --- |
+| `http://<host>:8020/admin/` | Django admin panel |
+| `http://<host>:8020/truck-signs/products/` | Product API |
 
-5. Install requirements:
-```bash
-pip install -r requirements.txt
-```
+Stop with `docker compose down` (keeps data) or `docker compose down -v` (deletes it).
 
-6. Migrate database:
-```bash
-python src/manage.py makemigrations
-python src/manage.py migrate
-```
+### How to Build the Image
 
-7. Collect static files:
-```bash
-python src/manage.py collectstatic
-```
+Only needed when you change the application or the `Dockerfile` - otherwise the image is pulled.
 
-8. Start the Python Development Server:
 ```bash
-python src/manage.py runserver
+# arbitrary local tag
+docker build -t truck-sign:local .
+
+# under the name the Compose file expects, so `docker compose up` uses your build
+docker build -t ghcr.io/cookiecrack3r/truck-sign:v1.0.1 .
 ```
 
 ## Usage
 
-### Settings
+### Configuration
 
-The `settings.py` folder inside the `src/tsa_app` folder contains the different settings configuration for the application.
+All configuration comes from environment variables, read from the `.env` file next to
+`docker-compose.yml`. Nothing sensitive is stored in the repository.
 
-The `example.env` file in the project root contains an overview about configuration values that can be set for the app.
+`docker-compose.yml` uses two forms: `${VAR:-default}` is optional, `${VAR:?message}` is required
+and aborts with that message if unset - rather than silently starting with an insecure default.
 
-### Control Application Settings via Env-Variables
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SECRET_KEY` | **required** | Django signing key. Unique per deployment. |
+| `DB_PASSWORD` | **required** | PostgreSQL password, used by both services. |
+| `MODE` | `prod` | `prod` selects PostgreSQL, anything else SQLite. |
+| `DEBUG_ENABLED` | `False` | Never `True` on a public host. |
+| `LOG_LEVEL` | `ERROR` | Django log level. |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma separated. Add your server address, otherwise Django answers `400`. |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Origins allowed to call the API. |
+| `DB_NAME` / `DB_USER` | `trucksigns_db` / `trucksigns_user` | Database name and user. |
+| `DB_HOST` / `DB_PORT` | `db` / `5432` | Database address. Change only to point the backend at a database outside this stack. |
+| `BACKEND_PORT` | `8020` | Host port. Change it here, not the container port `8000`. |
+| `IMAGE_TAG` | `v1.0.1` | Image tag to deploy. Use `main` for the latest default-branch build. |
+| `GUNICORN_WORKERS` / `GUNICORN_BIND` | `4` / `0.0.0.0:8000` | Worker processes and bind address. |
+| `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | empty | When username and password are set, the entrypoint creates this admin account on first start and skips it on every later start. |
+| `CLOUD_NAME` / `CLOUD_API_KEY` / `CLOUD_API_SECRET` | empty | Optional Cloudinary storage. Empty means local media volume. |
 
-You can provide all configuration via a `.env` file in the project root.
-Copy `example.env` to `.env`, fill in the required values (DB, SECRET_KEY, etc.), and keep this file out of version 
-control to avoid leaking secrets.
+Also worth changing in `docker-compose.yml`: the image path if you forked the repository, and
+`postgres:17-alpine` if you need another major version - an existing data volume cannot be read by
+a newer major version.
 
-**Database switch via MODE**
-- `MODE=prod` -> PostgreSQL, using `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` from `.env`.
-- `MODE` unset or `MODE=dev` -> SQLite at `src/db.sqlite3`; no DB env vars needed.
+### Building and Publishing the Image
 
-### Models
+The `Dockerfile` is based on `python:3.12-slim`, pinned to a minor version for reproducible
+builds. `requirements.txt` is installed before the application code so the dependency layer is
+cached. The container runs as an unprivileged user (`UID 10001`), the final `WORKDIR` is
+`/app/src`, and `EXPOSE 8000` documents Gunicorn's port inside the container - the host port is
+mapped by Compose.
 
-Most of the models do what can be inferred from their name. The following dots are notes about some of the models to make clearer their propose:
-- __Category Model:__ The category of the vinyls in the store. It contains the title of the category as well as the basic properties shared among products that belong to a same category. For example, _Truck Logo_ is a category for all vinyls that has a logo of a truck plus some lines of letterings (note that the vinyls are instances of the model _Product_). Another category is _Fire Extinguisher_, that is for all vinyls that has a logo of a fire extinguisher.
-- __Lettering Item Category:__ This is the category of the lettering, for example: _Company Name_, _VIM NUMBER_, ... Each has a different pricing.
-- __Lettering Item Variations:__ This contains a foreign key to the __Lettering Item Category__ and the text added by the client.
-- __Product Variation:__ This model has the original product as a foreign key, plus the lettering lines (instances of the __Lettering Item Variations__ model) added by the client.
+Publishing manually (normally done by CI):
 
-### Brief Explanation of the Views
+```bash
+echo "<your-github-token>" | docker login ghcr.io -u <your-github-username> --password-stdin
+docker build -t ghcr.io/<your-github-username>/truck-sign:v1.0.1 .
+docker push ghcr.io/<your-github-username>/truck-sign:v1.0.1
+```
 
-Most of the views are CBV imported from _rest_framework.generics_, and they allow the backend api to do the basic CRUD operations expected, and so they inherit from the _ListAPIView_, _CreateAPIView_, _RetrieveAPIView_, ..., and so on.
+### Running with docker run
 
-The behavior of some of the views had to be modified to address functionalities such as creation of order and payment, as in this case, for example, both functionalities are implemented in the same view, and so a _GenericAPIView_ was the view from which it inherits. Another example of this is the _UploadCustomerImage_ View that takes the vinyl template uploaded by the clients and creates a new product based on it.
+Compose is the intended way; this is the equivalent by hand. Replace every `<placeholder>` and
+**never put real credentials into a command you commit or share**.
 
-### Installation
+```bash
+docker network create tsa-network
 
-1. Clone the repo:
-    ```bash
-    git clone <INSERT URL>
-    cd truck-signs-api
-    ```
-1. Configure a virtual env
-    ```bash
-    python -m venv venv
-    venv\Scripts\activate
-    ```
-1. Configure the environment variables.
-    1. Copy the content of the `example.env` file that is on projects root level into a `.env` file:
-        ```bash
-        cp example.env .env
-        ```
-    2. The new `.env` file should contain all the environment variables necessary to run all the django app in all the environments. However, the only needed variables for the development environment to run are the following:
-        ```bash
-        SECRET_KEY
-        DB_NAME
-        DB_USER
-        DB_PASSWORD
-        DB_HOST
-        DB_PORT
-        EMAIL_HOST_USER
-        EMAIL_HOST_PASSWORD
-        ```
-    3. For the `postgres` database, the default configuration should be:
-        ```bash
-        DB_NAME=trucksigns_db
-        DB_USER=trucksigns_user
-        DB_PASSWORD=supertrucksignsuser!
-        DB_HOST=localhost
-        DB_PORT=5432
-        ```
-    4. The SECRET_KEY is the django secret key. To generate a new one see: [Stackoverflow Link](https://stackoverflow.com/questions/41298963/is-there-a-function-for-generating-settings-secret-key-in-django)
+docker run -d \
+  --name tsa_db \
+  --network tsa-network \
+  --restart unless-stopped \
+  -e POSTGRES_DB='<your-database-name>' \
+  -e POSTGRES_USER='<your-database-user>' \
+  -e POSTGRES_PASSWORD='<your-database-password>' \
+  -v postgres_data:/var/lib/postgresql/data \
+  postgres:17-alpine
 
-    5. The `EMAIL_HOST_USER` and the `EMAIL_HOST_PASSWORD` are the credentials to send emails from the website when a client makes a purchase. This is currently disable, but the code to activate this can be found in views.py in the create order view as comments. Therefore, any valid email and password will work.
-1. Run the migrations:
-    ```bash
-    python src/manage.py makemigrations
-    python src/manage.py migrate
-    ```
-1. Collect static files:
-    ```bash
-    python src/manage.py collectstatic
-    ```
-1. Run the app:
-    ```bash
-    python src/manage.py runserver
-    ```
-1. (Optional step) To create a super user run:
-    ```bash
-    python src/manage.py createsuperuser
-    ```
-1. (Optional step) Set up the database. [Django database setup example](https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu-16-04).
+docker run -d \
+  --name tsa_backend \
+  --network tsa-network \
+  --restart unless-stopped \
+  -p 8020:8000 \
+  -e SECRET_KEY='<your-django-secret-key>' \
+  -e ALLOWED_HOSTS='localhost,127.0.0.1,<your-server-address>' \
+  -e DB_NAME='<your-database-name>' \
+  -e DB_USER='<your-database-user>' \
+  -e DB_PASSWORD='<your-database-password>' \
+  -e DB_HOST='tsa_db' \
+  -e DJANGO_SUPERUSER_USERNAME='<your-admin-username>' \
+  -e DJANGO_SUPERUSER_PASSWORD='<your-admin-password>' \
+  -v static_files:/app/src/staticfiles \
+  -v media_files:/app/src/mediafiles \
+  ghcr.io/cookiecrack3r/truck-sign:v1.0.1
+```
 
-Congratulations =) !!! The App should be running in [localhost:8000](http://localhost:8000)
+Secrets on the command line end up in the shell history and in `docker inspect`. Prefer
+`--env-file .env` instead of the individual `-e` flags.
+
+### Data Persistence
+
+Three named volumes, managed by Docker rather than bound to a host directory, so no permanent
+link exists from the host into the container:
+
+| Volume | Mounted at |
+| --- | --- |
+| `postgres_data` | `/var/lib/postgresql/data` |
+| `static_files` | `/app/src/staticfiles` |
+| `media_files` | `/app/src/mediafiles` |
+
+They survive `docker compose down` and a host reboot. Only `docker compose down -v` deletes them.
+
+### Common Commands
+
+```bash
+docker compose pull                  # fetch the tag named in .env
+docker compose logs -f backend       # follow the log
+docker compose ps                    # status and published ports
+docker compose exec backend python manage.py createsuperuser
+docker compose exec db pg_dump -U <user> <database> > backup.sql
+```
+
+Common problems: `DB_PASSWORD must be set in .env` means the `.env` is missing; a `400` on every
+URL means the host is not in `ALLOWED_HOSTS`; `manifest unknown` on pull means the GHCR package is
+private or the tag does not exist.
+
+## Repository Contents
+
+| Path | Description |
+| --- | --- |
+| `Dockerfile` | Builds the backend image: `python:3.12-slim`, dependencies, unprivileged user, entrypoint. |
+| `docker-compose.yml` | The stack: `backend` (pulled from GHCR) and `db` (PostgreSQL), one network, three named volumes. |
+| `entrypoint.sh` | Waits for PostgreSQL, migrates, collects static files, ensures the admin account, starts Gunicorn. |
+| `example.env` | Template for `.env`. Copy it; never commit the real one. |
+| `requirements.txt` | Pinned Python dependencies. |
+| `pyproject.toml` | Config for `black`, `isort` and `flake8`. |
+| `Procfile` | Legacy Heroku process definition. Unused by the container setup. |
+| `.dockerignore` | Keeps git metadata, docs and `.env` out of the image. |
+| `.gitattributes` | Forces LF endings for shell scripts - a CRLF shebang breaks the container. |
+| `.github/workflows/` | Build, test and PR-check pipelines. See [CI/CD Pipeline](#cicd-pipeline). |
+| `docs/testing.md` | Linter and test setup. |
+| `src/` | The Django project: `manage.py`, `tsa_app` (settings, URLs, WSGI), `tsa_products` (models, views, tests). |
+
+## CI/CD Pipeline
+
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| `build.yaml` | push to `main`, any tag, manual | Builds the image and pushes it to GHCR. Needs `packages: write`; `docker/metadata-action` derives the tags and lowercases the image name, which GHCR requires. |
+| `test.yaml` | push/PR on `main` touching Python files | `flake8`, `black --check`, `isort --check-only`, then the Django test suite with `MODE=dev` (SQLite, no database service needed). |
+| `check-open-pr.yaml` | push to any branch except `main` | Fails if the branch has no open pull request. |
+
+The image `build.yaml` publishes is exactly what `docker-compose.yml` pulls - which is why the
+Compose file has no `build` context. After the first push, set the GHCR package to **public**,
+otherwise every deployment host needs `docker login ghcr.io`.
+
+## API and Admin
+
+All API routes live under `/truck-signs/`, the admin panel under `/admin/`. The route at `/`
+renders an intentionally empty layout template - the shop frontend is a separate project.
+
+| Endpoint | |
+| --- | --- |
+| `/truck-signs/products/` | List products |
+| `/truck-signs/categories/` | List categories |
+| `/truck-signs/product-detail/<id>/` | Single product |
+| `/truck-signs/product-color/` | Available colors |
+| `/truck-signs/order/<id>/create/` | Create an order |
+
+The full list is in `src/tsa_products/urls.py`. Most views are DRF generic class based views;
+order creation and customer image upload use `GenericAPIView` because they combine several steps.
 
 > [!NOTE]
-> To create Truck vinyls with Truck logos in them, first create the __Category__ Truck Sign,
-> and then the __Product__ (can have any name). This is to make sure the frontend retrieves
-> the Truck vinyls for display in the Product Grid as it only fetches the products of the
-> category Truck Sign.
+> To create truck vinyls with truck logos, first create the __Category__ Truck Sign, then the
+> __Product__. The frontend only fetches products of that category.
 
----
+## Screenshots
 
-## Screenshots of the Django Backend Admin Panel
+<div align="center">
 
-### Mobile View
+![Admin panel](./src/screenshots/Admin_Panel_View.png)
 
-<div style="padding: 0 5rem; width: 100%;  display: flex; gap: 5rem; justify-content: center; flex-wrap: wrap;">
+![Admin panel](./src/screenshots/Admin_Panel_View_2.png)
 
-![alt text](./src/screenshots/Admin_Panel_View_Mobile.png)
-
-![alt text](./src/screenshots/Admin_Panel_View_Mobile_2.png)
-
-![alt text](./src/screenshots/Admin_Panel_View_Mobile_3.png)
+![Admin panel, mobile](./src/screenshots/Admin_Panel_View_Mobile.png)
 
 </div>
 
-### Desktop View
+## Further Reading
 
-
-<div style="padding: 0 5rem; width: 100%; display: flex; flex-direction: column; gap: 2rem; align-items: center; justify-content: center;">
-
-![alt text](./src/screenshots/Admin_Panel_View.png)
-
-![alt text](./src/screenshots/Admin_Panel_View_2.png)
-
-![alt text](./src/screenshots/Admin_Panel_View_3.png)
-
-</div>
-
-## Additional Information
-
-### Postgresql Database
-
-- Setup Database: [Digital Ocean Link for Django Deployment on VPS](https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu-16-04)
-
-### Docker
-
-- [Docker Oficial Documentation](https://docs.docker.com/)
-- Dockerizing Django, PostgreSQL, guinicorn, and Nginx:
-    - Github repo of sunilale0: [Link](https://github.com/sunilale0/django-postgresql-gunicorn-nginx-dockerized/blob/master/README.md#nginx)
-    - Michael Herman article on testdriven.io: [Link](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/)
-
-### Django and DRF
-
-- [Django Official Documentation](https://docs.djangoproject.com/en/5.2/)
-- Generate a new secret key: [Stackoverflow Link](https://stackoverflow.com/questions/41298963/is-there-a-function-for-generating-settings-secret-key-in-django)
-- Modify the Django Admin:
-    - Small modifications (add searching, columns, ...): [Link](https://realpython.com/customize-django-admin-python/)
-    - Modify Templates and css: [Link from Medium](https://medium.com/@brianmayrose/django-step-9-180d04a4152c)
-- [Django Rest Framework Official Documentation](https://www.django-rest-framework.org/)
-- More about Nested Serializers: [Stackoverflow Link](https://stackoverflow.com/questions/51182823/django-rest-framework-nested-serializers)
-- More about GenericViews: [Testdriver.io Link](https://testdriven.io/blog/drf-views-part-2/)
-
-### Miscellaneous
-
-- Create Virual Environment with Virtualenv and Virtualenvwrapper: [Link](https://docs.python-guide.org/dev/virtualenvs/)
-- [Configure CORS](https://www.stackhawk.com/blog/django-cors-guide/)
-- [Setup Django with Cloudinary](https://cloudinary.com/documentation/django_integration)
+- [Docker documentation](https://docs.docker.com/) and the [Compose file reference](https://docs.docker.com/reference/compose-file/)
+- [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+- [Django documentation](https://docs.djangoproject.com/en/5.2/) and the [deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/)
+- [Django REST Framework](https://www.django-rest-framework.org/)
+- [Testing setup in this repository](./docs/testing.md)

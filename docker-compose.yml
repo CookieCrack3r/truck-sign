@@ -1,49 +1,96 @@
+# Truck Signs API - application stack (Django backend + PostgreSQL).
+#
+# This file never builds anything: it pulls the image that the "Build
+# Application" workflow (.github/workflows/build.yaml) publishes to GHCR.
+# See README.md for how to build and publish that image yourself.
+#
+# Usage:
+#   cp example.env .env    # then fill in the values
+#   docker compose up -d
+#
+# The API is served on http://<host>:8020/ by default.
+
 services:
   db:
-    image: postgres:7-alpine
+    image: postgres:17-alpine
     container_name: tsa_db
-    env_file: .env
-    networks:
-      - tsa-network
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-trucksigns_db}
+      POSTGRES_USER: ${DB_USER:-trucksigns_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     volumes:
+      # Named volume - the database survives `docker compose down` and any
+      # restart. No host path is bound into the container.
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - '5432:5432'
     healthcheck:
+      # The backend only starts once this reports healthy.
       test:
         [
           'CMD-SHELL',
-          'pg_isready -U ${DB_USER} -d ${DB_NAME}',
+          'pg_isready -U ${DB_USER:-trucksigns_user} -d ${DB_NAME:-trucksigns_db}',
         ]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  backend:
-    build: .
-    container_name: tsa_backend
-    command: gunicorn tsa_app.wsgi:application --bind 0.0.0.0:8000 --workers 4
+      start_period: 10s
     networks:
       - tsa-network
+    # Deliberately no host port mapping: the database is reachable only from
+    # inside the Compose network, never from the internet.
+
+  backend:
+    # Pulled, not built. The default is a pinned release tag; override IMAGE_TAG
+    # in .env to deploy a different build.
+    image: ghcr.io/cookiecrack3r/truck-sign:${IMAGE_TAG:-v1.0.1}
+    container_name: tsa_backend
+    restart: unless-stopped
     environment:
-      MODE: prod
-      DEBUG_ENABLED: 'False'
-      DB_NAME: trucksigns_db
-      DB_USER: trucksigns_user
-      DB_PASSWORD: supertrucksignsuser!
-      DB_HOST: tsa_db
-      DB_PORT: 5432
-      ALLOWED_HOSTS: localhost,127.0.0.1,tsa-web
+      MODE: ${MODE:-prod}
+      DEBUG_ENABLED: ${DEBUG_ENABLED:-False}
+      LOG_LEVEL: ${LOG_LEVEL:-ERROR}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      # Database. DB_HOST defaults to the service name above, resolved by
+      # Docker's embedded DNS inside tsa-network.
+      DB_NAME: ${DB_NAME:-trucksigns_db}
+      DB_USER: ${DB_USER:-trucksigns_user}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      # Optional: when username and password are set, the entrypoint creates
+      # the admin account on first start and skips it afterwards.
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+      # Optional Cloudinary media storage - left empty, Django falls back to
+      # local media files.
+      CLOUD_NAME: ${CLOUD_NAME:-}
+      CLOUD_API_KEY: ${CLOUD_API_KEY:-}
+      CLOUD_API_SECRET: ${CLOUD_API_SECRET:-}
+    ports:
+      # Host 8020 -> gunicorn 8000 inside the container. This is the only
+      # port published to the outside world.
+      - '${BACKEND_PORT:-8020}:8000'
     volumes:
-      - ./src/staticfiles:/app/src/staticfiles
-      - ./src/media:/app/src/media
+      # Named volumes rather than host bind mounts: collected static files and
+      # uploaded media persist across restarts without a permanent link from
+      # the host into the container.
+      - static_files:/app/src/staticfiles
+      - media_files:/app/src/mediafiles
     depends_on:
       db:
         condition: service_healthy
-
-volumes:
-  postgres_data:
+    networks:
+      - tsa-network
 
 networks:
   tsa-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
